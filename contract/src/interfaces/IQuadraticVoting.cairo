@@ -1,9 +1,10 @@
 use starknet::ContractAddress;
+use contract::structs::votestructs::{ProposalStatus};
 
 #[starknet::interface]
-trait IQVVoting<TContractState> {
+pub trait IQuadraticVoting<TContractState> {
     // / Create a new proposal
-    fn create_proposal(ref self: TContractState, description: felt252, vote_expiration_time: u64) -> u64;
+    fn create_proposal(ref self: TContractState, description: ByteArray, vote_expiration_time: u64) -> u64;
 
     // / Get proposal tally
     fn set_proposal_to_tally(ref self: TContractState, proposal_id: u64);
@@ -18,7 +19,7 @@ trait IQVVoting<TContractState> {
     fn get_proposal_expiration_time(self: @TContractState, proposal_id: u64) -> u64;
 
     // / Count votes for a proposal
-    fn count_votes(self: @TContractState, proposal_id: u256) -> (u256, u256);
+    fn count_votes(self: @TContractState, proposal_id: u64) -> (u256, u256);
 
     // Case vote for a proposal
     fn cast_vote(ref self: TContractState, proposal_id: u64, num_tokens: u256, vote: bool);
@@ -28,10 +29,4 @@ trait IQVVoting<TContractState> {
 
     // Sqrt function
     fn sqrt(self: @TContractState, x: u256) -> u256;
-
-    // Mint tokens
-    fn mint(ref self: TContractState, account: ContractAddress, amount: u256);
-
-    // Balance of an account
-    fn balance_of(self: @TContractState, account: ContractAddress) -> u256;
 }
