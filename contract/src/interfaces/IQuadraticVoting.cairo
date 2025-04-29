@@ -29,4 +29,7 @@ pub trait IQuadraticVoting<TContractState> {
 
     // Sqrt function
     fn sqrt(self: @TContractState, x: u256) -> u256;
+
+    // Mint function
+    fn mint(ref self: TContractState, recipient: ContractAddress, amount: u256);
 }

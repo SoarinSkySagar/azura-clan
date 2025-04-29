@@ -83,17 +83,17 @@ pub mod QuadraticVoting {
 
     #[derive(Drop, starknet::Event)]
     pub struct VoteCasted {
-        voter: ContractAddress,
-        proposal_id: u64,
-        weight: u256,
+        pub voter: ContractAddress,
+        pub proposal_id: u64,
+        pub weight: u256,
     }
 
     #[derive(Drop, starknet::Event)]
     pub struct ProposalCreated {
-        creator: ContractAddress,
-        proposal_id: u64,
-        description: ByteArray,
-        voting_time_in_hours: u64,
+        pub creator: ContractAddress,
+        pub proposal_id: u64,
+        pub description: ByteArray,
+        pub voting_time_in_hours: u64,
     }
 
     #[constructor]
@@ -106,16 +106,6 @@ pub mod QuadraticVoting {
         self.total_supply.write(0);
     }
 
-    #[generate_trait]
-    #[abi(per_item)]
-    impl ExternalImpl of ExternalTrait {
-        #[external(v0)]
-        fn mint(ref self: ContractState, recipient: ContractAddress, amount: u256) {
-            self.ownable.assert_only_owner();
-            self.erc20.mint(recipient, amount);
-        }
-    }
-
     #[abi(embed_v0)]
     impl QuadraticVotingImpl of IQuadraticVoting<ContractState> {
         fn create_proposal(
@@ -123,6 +113,8 @@ pub mod QuadraticVoting {
         ) -> u64 {
             assert!(vote_expiration_time > 0, "The voting period cannot be 0");
             assert!(description.len() > 0, "The description cannot be empty");
+
+            self.ownable.assert_only_owner();
 
             let proposal_count = self.proposal_count.read() + 1;
             self.proposal_count.write(proposal_count);
@@ -161,7 +153,7 @@ pub mod QuadraticVoting {
             assert!(proposal.status.read() == ProposalStatus::IN_PROGRESS, "Vote is not in progress");
             assert!(
                 starknet::get_block_timestamp() >= proposal.expiration_time.read(),
-                "voting period has not expired"
+                "Voting period has not expired"
             );
 
             proposal.status.write(ProposalStatus::TALLY);
@@ -176,7 +168,7 @@ pub mod QuadraticVoting {
             assert!(proposal.status.read() == ProposalStatus::TALLY, "Proposal should be in tally");
             assert!(
                 starknet::get_block_timestamp() >= proposal.expiration_time.read(),
-                "voting period has not expired"
+                "Voting period has not expired"
             );
 
             proposal.status.write(ProposalStatus::ENDED);
@@ -234,16 +226,18 @@ pub mod QuadraticVoting {
             let contract_address = get_contract_address();
             let proposal = self.proposals.entry(proposal_id);
 
-            assert!(proposal.status.read() == ProposalStatus::IN_PROGRESS, "proposal has expired.");
-            assert!(!self.user_has_voted(proposal_id, caller), "user already voted on this proposal");
+            assert!(proposal.status.read() == ProposalStatus::IN_PROGRESS, "Proposal has expired.");
+            assert!(!self.user_has_voted(proposal_id, caller), "User already voted on this proposal");
             assert!(
                 proposal.expiration_time.read() > starknet::get_block_timestamp(),
-                "for this proposal, the voting time expired"
+                "For this proposal, the voting time expired"
             );
 
             let voter_balance = self.erc20.balance_of(caller);
 
-            assert!(voter_balance >= num_tokens, "not enough tokens to vote");
+            assert!(voter_balance >= num_tokens, "Not enough tokens to vote");
+
+            self.erc20.approve(contract_address, num_tokens);
 
             self.erc20.transfer_from(
                 caller,
@@ -275,6 +269,11 @@ pub mod QuadraticVoting {
 
         fn sqrt(self: @ContractState, x: u256) -> u256 {
             x.sqrt().into()
+        }
+
+        fn mint(ref self: ContractState, recipient: ContractAddress, amount: u256) {
+            self.ownable.assert_only_owner();
+            self.erc20.mint(recipient, amount);
         }
     }
 
