@@ -1,6 +1,6 @@
 use contract::interfaces::IQuadraticVoting::{IQuadraticVotingDispatcher, IQuadraticVotingDispatcherTrait, IQuadraticVotingSafeDispatcher};
 use contract::contracts::vote::QuadraticVoting;
-use contract::structs::votestructs::{ProposalStatus};
+use contract::structs::votestructs::{ProposalStatus, Vote};
 
 use openzeppelin::access::ownable::interface::{IOwnableDispatcher};
 use snforge_std::{
@@ -49,7 +49,7 @@ fn deploy_contract() -> (IQuadraticVotingDispatcher, IOwnableDispatcher, IQuadra
 fn test_create_proposal() {
     let (qv, _, _) = deploy_contract();
 
-    let description = "Test Proposal";
+    let description: ByteArray = "Test Proposal";
     let voting_time: u64 = 24; // hours
     let mut spy = spy_events();
 
@@ -148,4 +148,110 @@ fn test_get_proposal_expiration_time() {
     let proposal_expiration_time = qv.get_proposal_expiration_time(proposal_id);
 
     assert!(proposal_expiration_time > 0, "Proposal expiration time should be greater than 0");
+}
+
+#[test]
+fn test_cast_vote() {
+    let (qv, _, _) = deploy_contract();
+
+    let description: ByteArray = "Test Proposal";
+    let num_tokens: u256 = 10;
+    let voting_time: u64 = 24; // hours
+
+    start_cheat_caller_address(qv.contract_address, OWNER());
+
+    qv._mint(VOTER(), num_tokens);
+    let voter_balance_before = qv._balance_of(VOTER());
+    let contract_balance_before = qv._balance_of(qv.contract_address);
+
+    let proposal_id = qv.create_proposal(description.clone(), voting_time);
+
+    stop_cheat_caller_address(qv.contract_address);
+
+    start_cheat_caller_address(qv.contract_address, VOTER());
+
+    qv.cast_vote(proposal_id, num_tokens, Vote::YES);
+
+    let voter_balance_after = qv._balance_of(VOTER());
+    let contract_balance_after = qv._balance_of(qv.contract_address);
+
+    assert!(qv.user_has_voted(proposal_id, VOTER()), "User should have voted on this proposal");
+    assert!(voter_balance_after == voter_balance_before - num_tokens, "Voter balance should be 0 after voting");
+    assert!(contract_balance_after == contract_balance_before + num_tokens, "Contract balance should be equal to the number of tokens");
+    assert!(qv.get_proposal_status(proposal_id) == ProposalStatus::IN_PROGRESS, "Proposal status should be IN_PROGRESS");
+    assert!(qv.get_proposal_expiration_time(proposal_id) > 0, "Proposal expiration time should be greater than 0");
+    
+    stop_cheat_caller_address(qv.contract_address);
+}
+
+#[test]
+fn test_user_has_voted() {
+    let (qv, _, _) = deploy_contract();
+
+    let description: ByteArray = "Test Proposal";
+    let voting_time: u64 = 24; // hours
+
+    start_cheat_caller_address(qv.contract_address, OWNER());
+
+    qv._mint(VOTER(), 10);
+
+    let proposal_id = qv.create_proposal(description.clone(), voting_time);
+
+    stop_cheat_caller_address(qv.contract_address);
+
+    start_cheat_caller_address(qv.contract_address, VOTER());
+
+    qv.cast_vote(proposal_id, 10, Vote::YES);
+
+    assert!(qv.user_has_voted(proposal_id, VOTER()), "User should have voted on this proposal");
+
+    stop_cheat_caller_address(qv.contract_address);
+}
+
+#[test]
+fn test_sqrt() {
+    let (qv, _, _) = deploy_contract();
+
+    let x: u256 = 16;
+
+    start_cheat_caller_address(qv.contract_address, OWNER());
+
+    let result = qv.sqrt(x);
+
+    assert!(result == 4, "Square root of 16 should be 4");
+
+    stop_cheat_caller_address(qv.contract_address);
+}
+
+#[test]
+fn test_count_vote() {
+    let (qv, _, _) = deploy_contract();
+
+    let description: ByteArray = "Test Proposal";
+    let voting_time: u64 = 24; // hours
+
+    start_cheat_caller_address(qv.contract_address, OWNER());
+
+    qv._mint(OWNER(), 20);
+    qv._mint(VOTER(), 10);
+
+    let proposal_id = qv.create_proposal(description.clone(), voting_time);
+
+    qv.cast_vote(proposal_id, 20, Vote::NO);
+
+    stop_cheat_caller_address(qv.contract_address);
+
+    start_cheat_caller_address(qv.contract_address, VOTER());
+
+    qv.cast_vote(proposal_id, 10, Vote::YES);
+
+    let (yes_votes, no_votes) = qv.count_votes(proposal_id);
+
+    println!("Yes votes: {}", yes_votes);
+    println!("No votes: {}", no_votes);
+
+    assert!(yes_votes == 3, "Yes votes should be 3 => sqrt(10)");
+    assert!(no_votes == 4, "No votes should be 4 => sqrt(20)");
+
+    stop_cheat_caller_address(qv.contract_address);
 }
