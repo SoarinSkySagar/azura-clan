@@ -1,6 +1,13 @@
 use starknet::ContractAddress;
 use starknet::storage::{Map, Vec};
 
+#[derive(Copy, PartialEq, Drop, Serde, starknet::Store)]
+pub enum Vote {
+    #[default]
+    YES,
+    NO,
+}
+
 #[derive(Drop, Serde, PartialEq, starknet::Store)]
 pub enum ProposalStatus {
     #[default]
@@ -24,6 +31,6 @@ pub struct Proposal {
 #[derive(Drop, Serde, starknet::Store)]
 pub struct Voter {
     pub has_voted: bool,
-    pub vote: bool,
+    pub vote: Vote,
     pub weight: u256,
 }

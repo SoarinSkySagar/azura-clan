@@ -1,40 +1,6 @@
-use starknet::ContractAddress;
-use contract::structs::votestructs::{ProposalStatus};
-
-#[starknet::interface]
-pub trait IQuadraticVoting<TContractState> {
-    // / Create a new proposal
-    fn create_proposal(ref self: TContractState, description: ByteArray, vote_expiration_time: u64) -> u64;
-
-    // / Get proposal tally
-    fn set_proposal_to_tally(ref self: TContractState, proposal_id: u64);
-
-    // / Set proposal to ended
-    fn set_proposal_to_ended(ref self: TContractState, proposal_id: u64);
-
-    // / Get proposal status
-    fn get_proposal_status(self: @TContractState, proposal_id: u64) -> ProposalStatus;
-
-    // / Get proposal expiration time
-    fn get_proposal_expiration_time(self: @TContractState, proposal_id: u64) -> u64;
-
-    // / Count votes for a proposal
-    fn count_votes(self: @TContractState, proposal_id: u64) -> (u256, u256);
-
-    // Case vote for a proposal
-    fn cast_vote(ref self: TContractState, proposal_id: u64, num_tokens: u256, vote: bool);
-
-    // Check if a user has voted
-    fn user_has_voted(self: @TContractState, proposal_id: u64, user: ContractAddress) -> bool;
-
-    // Sqrt function
-    fn sqrt(self: @TContractState, x: u256) -> u256;
-}
-
-
 #[starknet::contract]
 pub mod QuadraticVoting {
-    use contract::structs::votestructs::{Proposal, ProposalStatus, Voter};
+    use contract::structs::votestructs::{Proposal, ProposalStatus, Voter, Vote};
     use contract::interfaces::IQuadraticVoting::IQuadraticVoting;
 
     use starknet::{ContractAddress, get_caller_address, get_contract_address};
@@ -51,12 +17,12 @@ pub mod QuadraticVoting {
 
     #[abi(embed_v0)]
     impl ERC20MixinImpl = ERC20Component::ERC20MixinImpl<ContractState>;
+    impl ERC20InternalImpl = ERC20Component::InternalImpl<ContractState>;
+
     #[abi(embed_v0)]
     impl OwnableMixinImpl = OwnableComponent::OwnableMixinImpl<ContractState>;
     impl OwnableTwoStepImpl = OwnableComponent::OwnableTwoStepImpl<ContractState>;
     impl OwnableImpl = OwnableComponent::OwnableImpl<ContractState>;
-
-    impl ERC20InternalImpl = ERC20Component::InternalImpl<ContractState>;
     impl OwnableInternalImpl = OwnableComponent::InternalImpl<ContractState>;
 
     #[storage]
@@ -205,12 +171,15 @@ pub mod QuadraticVoting {
                 let voter: ContractAddress = voters.at(i).read();
                 let voter_info: Voter = proposal.voter_info.entry(voter).read();
                 let weight: u256 = voter_info.weight;
-                let vote: bool = voter_info.vote;
+                let vote: Vote = voter_info.vote;
 
-                if vote {
-                    yes_votes = yes_votes + weight;
-                } else {
-                    no_votes = no_votes + weight;
+                match vote {
+                    Vote::YES => {
+                      yes_votes = yes_votes + weight;
+                    },
+                    Vote::NO => {
+                      no_votes = no_votes + weight;
+                    }
                 }
 
                 i += 1;
@@ -219,7 +188,7 @@ pub mod QuadraticVoting {
             (yes_votes, no_votes)
         }
 
-        fn cast_vote(ref self: ContractState, proposal_id: u64, num_tokens: u256, vote: bool) {
+        fn cast_vote(ref self: ContractState, proposal_id: u64, num_tokens: u256, vote: Vote) {
             self._valid_proposal(proposal_id);
 
             let caller = get_caller_address();
@@ -233,21 +202,18 @@ pub mod QuadraticVoting {
                 "For this proposal, the voting time expired"
             );
 
-            let voter_balance = self.erc20.balance_of(caller);
+            let voter_balance = self._balance_of(caller);
 
             assert!(voter_balance >= num_tokens, "Not enough tokens to vote");
 
-            self.erc20.approve(contract_address, num_tokens);
-
-            self.erc20.transfer_from(
-                caller,
+            self._transfer(
                 contract_address,
                 num_tokens,
             );
 
             let weight = self.sqrt(num_tokens);
 
-            let voter_info = Voter { has_voted: true, vote: vote, weight: weight };
+            let voter_info = Voter { has_voted: true, vote, weight: weight };
             proposal.voter_info.entry(caller).write(voter_info);
             proposal.voters.push(caller);
 
@@ -271,9 +237,40 @@ pub mod QuadraticVoting {
             x.sqrt().into()
         }
 
-        fn mint(ref self: ContractState, recipient: ContractAddress, amount: u256) {
+        fn _transfer(
+          ref self: ContractState, recipient: ContractAddress, amount: u256
+        ) {
+            self.erc20.transfer(recipient, amount);
+        }
+
+        fn _approve(
+            ref self: ContractState, spender: ContractAddress, amount: u256
+        ) {
+            self.erc20.approve(spender, amount);
+        }
+
+        fn _transfer_from(
+            ref self: ContractState, sender: ContractAddress, recipient: ContractAddress, amount: u256
+        ) {
+            self.erc20.transfer_from(sender, recipient, amount);
+        }
+
+        fn _balance_of(self: @ContractState, account: ContractAddress) -> u256 {
+            self.erc20.balance_of(account)
+        }
+
+        fn _total_supply(self: @ContractState) -> u256 {
+            self.erc20.total_supply()
+        }
+
+        fn _mint(ref self: ContractState, recipient: ContractAddress, amount: u256) {
             self.ownable.assert_only_owner();
+
             self.erc20.mint(recipient, amount);
+        }
+
+        fn _allowance(self: @ContractState, owner: ContractAddress, spender: ContractAddress) -> u256 {
+            self.erc20.allowance(owner, spender)
         }
     }
 
