@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --primary: #000000;
+  --button-bg: #000000;
+  --button-text: #ffffff;
+  --button-hover: #1f1f1f;
+  --muted-text: #4b5563;
+  --card-bg: #d9d9d9;
+  --section-bg: #f8f8f8;
+  --bg-light-gray: #efefef;
+}
+
+.dark {
+  --background: #000000;
+  --primary: #ffffff;
+  --button-bg: #ffffff;
+  --button-text: #000000;
+  --button-hover: #e5e5e5;
+  --muted-text: #9ca3af;
+  --card-bg: #2a2a2a;
+  --section-bg: #1a1a1a;
+  --bg-light-gray: #121212;
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-primary: var(--primary);
+  --color-button-bg: var(--button-bg);
+  --color-button-hover: var(--button-hover);
+  --color-button-text: var(--button-text);
+  --color-muted-text: var(--muted-text);
+  --color-card-bg: var(--card-bg);
+  --color-section-bg: var(--section-bg);
+  --color-bg-light-gray: var(--bg-light-gray);
+  --font-inter: var(--font-inter);
+}
+
+body {
+  background: var(--background);
+  color: var(--primary);
+  transition: all 300ms ease-in-out;
+}
