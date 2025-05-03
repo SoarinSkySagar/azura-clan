@@ -1,0 +1,33 @@
+{
+  "name": "azura-clan",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "author": "Azura Clan",
+  "workspaces": {
+    "packages": [
+      "client",
+      "contract",
+      "frontend"
+    ]
+  },
+  "scripts": {
+    "chain": "yarn workspace @azura-clan/contract chain",
+    "compile": "yarn workspace @azura-clan/contract compile",
+    "deploy": "yarn workspace @azura-clan/contract deploy",
+    "deploy:clear": "yarn workspace @azura-clan/contract deploy:clear",
+    "deploy:no-reset": "yarn workspace @azura-clan/contract deploy --no-reset",
+    "format": "yarn workspace @azura-clan/frontend format && yarn workspace @azura-clan/contract format",
+    "format:check": "yarn workspace @azura-clan/frontend format:check && yarn workspace @azura-clan/contract format:check",
+    "next:check-types": "yarn workspace @azura-clan/frontend check-types",
+    "next:lint": "yarn workspace @azura-clan/frontend lint",
+    "prepare": "husky",
+    "start": "yarn workspace @azura-clan/frontend dev",
+    "test": "yarn workspace @azura-clan/contract test",
+    "test:frontend": "yarn workspace @azura-clan/frontend test",
+    "vercel": "yarn workspace @azura-clan/frontend vercel",
+    "vercel:yolo": "yarn workspace @azura-clan/frontend vercel:yolo",
+    "verify": "yarn workspace @azura-clan/contract verify"
+  },
+  "packageManager": "yarn@3.2.3"
+}
