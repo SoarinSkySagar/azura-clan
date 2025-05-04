@@ -1,0 +1,9 @@
+{
+  "name": "@azura-clan/contract",
+  "version": "0.1.0",
+  "scripts": {
+    "chain": "starknet-devnet --seed 0 --account-class cairo1",
+    "compile": "scarb build",
+    "test": "snforge test"
+  }
+}
