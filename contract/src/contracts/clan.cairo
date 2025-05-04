@@ -1,13 +1,15 @@
 #[starknet::contract]
 pub mod ClanSystem {
+    use contract::interfaces::IClanNFT::{IClanNFTDispatcher, IClanNFTDispatcherTrait};
     use contract::interfaces::IClanSystem::IClanSystem;
     use contract::structs::clanstruct::Clan;
     use core::array::ArrayTrait;
-    use starknet::ContractAddress;
     use starknet::storage::{
         Map, MutableVecTrait, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
         Vec,
     };
+    use starknet::syscalls::deploy_syscall;
+    use starknet::{ClassHash, ContractAddress, get_contract_address};
 
     #[storage]
     struct Storage {
@@ -19,6 +21,10 @@ pub mod ClanSystem {
         clan_count: felt252,
         // Mapping from clan ID to Vec of member addresses
         clan_members: Map<felt252, Vec<ContractAddress>>,
+        // Mapping from clan ID to NFT contract address
+        clan_nft_contracts: Map<felt252, ContractAddress>,
+        // Class hash for the NFT contract
+        nft_class_hash: felt252,
     }
 
 
@@ -28,6 +34,7 @@ pub mod ClanSystem {
         ClanCreated: ClanCreated,
         MemberJoined: MemberJoined,
         MemberLeft: MemberLeft,
+        ClanNFTCreated: ClanNFTCreated,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -50,9 +57,23 @@ pub mod ClanSystem {
         pub member: ContractAddress,
     }
 
+    #[derive(Drop, starknet::Event)]
+    struct ClanNFTCreated {
+        pub clan_id: felt252,
+        pub nft_contract: ContractAddress,
+    }
+
+    #[constructor]
+    fn constructor(ref self: ContractState, class_hash: felt252) {
+        // Initialize class hash for the NFT contract
+        self.nft_class_hash.write(class_hash);
+    }
+
     #[abi(embed_v0)]
     impl ClanSystemImpl of IClanSystem<ContractState> {
-        fn create_clan(ref self: ContractState, name: ByteArray, symbol: ByteArray) {
+        fn create_clan(
+            ref self: ContractState, name: ByteArray, symbol: ByteArray, token_id: u256,
+        ) {
             // Validate symbol is exactly 3 characters
             assert(symbol.len() == 3, 'Symbol must be 3 characters');
             let caller = starknet::get_caller_address();
@@ -75,6 +96,12 @@ pub mod ClanSystem {
             // Initialize clan members vec and add creator
             self.clan_members.entry(clan_id).push(caller);
 
+            // Create NFT contract for the clan
+            self.create_clan_nft(name.clone(), symbol.clone(), clan_id);
+            // Mint NFT for the clan
+            let nft_dispatcher = self.get_nft_dispatcher(clan_id);
+            nft_dispatcher.mint_nft(token_id, caller);
+
             // Emit event
             self
                 .emit(
@@ -84,7 +111,7 @@ pub mod ClanSystem {
                 );
         }
 
-        fn join_clan(ref self: ContractState, clan_id: felt252) {
+        fn join_clan(ref self: ContractState, clan_id: felt252, token_id: u256) {
             let caller = starknet::get_caller_address();
 
             // Check if caller is already in a clan
@@ -109,12 +136,16 @@ pub mod ClanSystem {
             clan_members.push(caller);
             self.user_to_clan.entry(caller).write(clan_id);
 
+            // Mint NFT for the clan
+            let nft_dispatcher = self.get_nft_dispatcher(clan_id);
+            nft_dispatcher.mint_nft(token_id, caller);
+
             // Emit event
             self.emit(Event::MemberJoined(MemberJoined { clan_id, member: caller }));
         }
 
 
-        fn leave_clan(ref self: ContractState) {
+        fn leave_clan(ref self: ContractState, token_id: u256) {
             let caller = starknet::get_caller_address();
 
             // Get user's current clan
@@ -148,10 +179,37 @@ pub mod ClanSystem {
                 clan_members.at(i).write(*new_members.at(j));
                 j += 1;
             }
-            self.user_to_clan.entry(caller).write(0);
+
+            // Burn the NFT for the clan when leaving the clan
+            let nft_dispatcher = self.get_nft_dispatcher(clan_id);
+            nft_dispatcher.burn_nft(token_id);
 
             // Emit event
             self.emit(MemberLeft { clan_id, member: caller });
+        }
+
+        fn create_clan_nft(
+            ref self: ContractState, name: ByteArray, symbol: ByteArray, clan_id: felt252,
+        ) {
+            let clan_address = get_contract_address();
+            let nft_class_hash: ClassHash = self.nft_class_hash.read().try_into().unwrap();
+
+            let mut constructor_calldata = array![];
+
+            (name, symbol, clan_address).serialize(ref constructor_calldata);
+
+            let (contract_address, _) = deploy_syscall(
+                nft_class_hash, 4242, constructor_calldata.span(), false,
+            )
+                .unwrap();
+
+            self.clan_nft_contracts.entry(clan_id).write(contract_address);
+
+            self.emit(ClanNFTCreated { clan_id, nft_contract: contract_address });
+        }
+
+        fn get_nft_dispatcher(self: @ContractState, clan_id: felt252) -> IClanNFTDispatcher {
+            IClanNFTDispatcher { contract_address: self.get_clan_nft(clan_id) }
         }
 
         fn get_clan_info(self: @ContractState, clan_id: felt252) -> Clan {
@@ -160,6 +218,10 @@ pub mod ClanSystem {
 
         fn get_user_clan(self: @ContractState, user: ContractAddress) -> felt252 {
             self.user_to_clan.entry(user).read()
+        }
+
+        fn get_clan_nft(self: @ContractState, clan_id: felt252) -> ContractAddress {
+            self.clan_nft_contracts.entry(clan_id).read()
         }
     }
 }

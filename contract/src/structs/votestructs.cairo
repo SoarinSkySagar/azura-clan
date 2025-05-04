@@ -25,7 +25,7 @@ pub struct Proposal {
     pub description: ByteArray,
     pub voters: Vec<ContractAddress>,
     pub expiration_time: u64,
-    pub voter_info: Map::<ContractAddress, Voter>,
+    pub voter_info: Map<ContractAddress, Voter>,
 }
 
 #[derive(Drop, Serde, starknet::Store)]

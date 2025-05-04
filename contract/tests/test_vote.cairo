@@ -1,15 +1,16 @@
-use contract::interfaces::IQuadraticVoting::{IQuadraticVotingDispatcher, IQuadraticVotingDispatcherTrait, IQuadraticVotingSafeDispatcher};
 use contract::contracts::vote::QuadraticVoting;
+use contract::interfaces::IQuadraticVoting::{
+    IQuadraticVotingDispatcher, IQuadraticVotingDispatcherTrait, IQuadraticVotingSafeDispatcher,
+};
 use contract::structs::votestructs::{ProposalStatus, Vote};
-
-use openzeppelin::access::ownable::interface::{IOwnableDispatcher};
+use core::traits::TryInto;
+use openzeppelin::access::ownable::interface::IOwnableDispatcher;
 use snforge_std::{
-    ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait, declare, spy_events, start_cheat_caller_address,
+    ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait, declare, spy_events,
+    start_cheat_block_timestamp, start_cheat_caller_address, stop_cheat_block_timestamp,
     stop_cheat_caller_address,
-    start_cheat_block_timestamp, stop_cheat_block_timestamp
 };
 use starknet::ContractAddress;
-use core::traits::TryInto;
 
 // Test account -> Owner
 fn OWNER() -> ContractAddress {
@@ -22,7 +23,9 @@ fn VOTER() -> ContractAddress {
 }
 
 // Helper function to deploy the contract
-fn deploy_contract() -> (IQuadraticVotingDispatcher, IOwnableDispatcher, IQuadraticVotingSafeDispatcher) {
+fn deploy_contract() -> (
+    IQuadraticVotingDispatcher, IOwnableDispatcher, IQuadraticVotingSafeDispatcher,
+) {
     let contract_class = declare("QuadraticVoting").unwrap().contract_class();
 
     let mut constructor_calldata = array![];
@@ -34,9 +37,7 @@ fn deploy_contract() -> (IQuadraticVotingDispatcher, IOwnableDispatcher, IQuadra
     name.serialize(ref constructor_calldata);
     symbol.serialize(ref constructor_calldata);
 
-    let (contract_address, _) = contract_class.deploy(
-        @constructor_calldata
-    ).unwrap();
+    let (contract_address, _) = contract_class.deploy(@constructor_calldata).unwrap();
 
     let qv = IQuadraticVotingDispatcher { contract_address };
     let ownable = IOwnableDispatcher { contract_address };
@@ -55,7 +56,6 @@ fn test_create_proposal() {
 
     start_cheat_caller_address(qv.contract_address, OWNER());
 
-
     start_cheat_caller_address(qv.contract_address, OWNER());
 
     let proposal_id = qv.create_proposal(description.clone(), voting_time);
@@ -70,7 +70,7 @@ fn test_create_proposal() {
             proposal_id: 1,
             description: description,
             voting_time_in_hours: voting_time,
-        }
+        },
     );
 
     spy.assert_emitted(@array![(qv.contract_address, expected_event)]);
@@ -131,7 +131,9 @@ fn test_get_proposal_status() {
 
     let proposal_status = qv.get_proposal_status(proposal_id);
 
-    assert!(proposal_status == ProposalStatus::IN_PROGRESS, "Proposal status should be IN_PROGRESS");
+    assert!(
+        proposal_status == ProposalStatus::IN_PROGRESS, "Proposal status should be IN_PROGRESS",
+    );
 }
 
 #[test]
@@ -176,11 +178,23 @@ fn test_cast_vote() {
     let contract_balance_after = qv._balance_of(qv.contract_address);
 
     assert!(qv.user_has_voted(proposal_id, VOTER()), "User should have voted on this proposal");
-    assert!(voter_balance_after == voter_balance_before - num_tokens, "Voter balance should be 0 after voting");
-    assert!(contract_balance_after == contract_balance_before + num_tokens, "Contract balance should be equal to the number of tokens");
-    assert!(qv.get_proposal_status(proposal_id) == ProposalStatus::IN_PROGRESS, "Proposal status should be IN_PROGRESS");
-    assert!(qv.get_proposal_expiration_time(proposal_id) > 0, "Proposal expiration time should be greater than 0");
-    
+    assert!(
+        voter_balance_after == voter_balance_before - num_tokens,
+        "Voter balance should be 0 after voting",
+    );
+    assert!(
+        contract_balance_after == contract_balance_before + num_tokens,
+        "Contract balance should be equal to the number of tokens",
+    );
+    assert!(
+        qv.get_proposal_status(proposal_id) == ProposalStatus::IN_PROGRESS,
+        "Proposal status should be IN_PROGRESS",
+    );
+    assert!(
+        qv.get_proposal_expiration_time(proposal_id) > 0,
+        "Proposal expiration time should be greater than 0",
+    );
+
     stop_cheat_caller_address(qv.contract_address);
 }
 

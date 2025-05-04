@@ -1,10 +1,12 @@
-use starknet::ContractAddress;
 use contract::structs::votestructs::{ProposalStatus, Vote};
+use starknet::ContractAddress;
 
 #[starknet::interface]
 pub trait IQuadraticVoting<TContractState> {
     // / Create a new proposal
-    fn create_proposal(ref self: TContractState, description: ByteArray, vote_expiration_time: u64) -> u64;
+    fn create_proposal(
+        ref self: TContractState, description: ByteArray, vote_expiration_time: u64,
+    ) -> u64;
 
     // / Get proposal tally
     fn set_proposal_to_tally(ref self: TContractState, proposal_id: u64);
@@ -37,7 +39,9 @@ pub trait IQuadraticVoting<TContractState> {
     fn _approve(ref self: TContractState, spender: ContractAddress, amount: u256);
 
     // Transfer tokens from one address to another
-    fn _transfer_from(ref self: TContractState, sender: ContractAddress, recipient: ContractAddress, amount: u256);
+    fn _transfer_from(
+        ref self: TContractState, sender: ContractAddress, recipient: ContractAddress, amount: u256,
+    );
 
     // Get balance of an address
     fn _balance_of(self: @TContractState, account: ContractAddress) -> u256;
